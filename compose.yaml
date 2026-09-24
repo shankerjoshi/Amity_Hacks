@@ -1,0 +1,60 @@
+services:
+  sandbox:
+    build: .
+    command: ["python", "-m", "sentinel.sandbox"]
+    environment:
+      PORT: "8001"
+      SENTINEL_INTERNAL_KEY: ${SENTINEL_INTERNAL_KEY:?Run python configure.py first}
+    volumes: ["sandbox-data:/app/data"]
+    networks: [backend]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  controller:
+    build: .
+    command: ["python", "-m", "sentinel.control"]
+    environment:
+      PORT: "8000"
+      SANDBOX_URL: http://sandbox:8001
+      SENTINEL_INTERNAL_KEY: ${SENTINEL_INTERNAL_KEY:?Run python configure.py first}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["control-data:/app/data"]
+    networks: [frontend, backend]
+    depends_on:
+      sandbox: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  attacker:
+    build: .
+    command: ["python", "-m", "sentinel.attacker"]
+    environment:
+      PORT: "8002"
+      GATEWAY_URL: http://controller:8000
+      SENTINEL_INTERNAL_KEY: ${ATTACKER_STARTUP_KEY:?Run python configure.py first}
+    ports: ["127.0.0.1:8002:8002"]
+    networks: [frontend]
+    depends_on:
+      controller: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+networks:
+  backend: {internal: true}
+  frontend: {}
+volumes:
+  sandbox-data: {}
+  control-data: {}

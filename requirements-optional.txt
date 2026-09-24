@@ -1,0 +1,2 @@
+# Optional: full YAML syntax support. JSON and basic YAML work without dependencies.
+PyYAML>=6.0.2,<7
